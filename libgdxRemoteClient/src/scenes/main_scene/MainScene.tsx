@@ -1,15 +1,22 @@
 import * as React from 'react'
 import {
-  PanResponder, Text, View
+  PanResponder,
+  PermissionsAndroid,
+  Text,
+  View
 } from 'react-native'
+import {Accelerometer} from 'react-native-sensors'
 import * as SocketIo from 'socket.io-client'
+import { EnvironmentVariables } from '../../Constants'
 import { PacketFactory } from '../../models/PacketFactory'
-import { ClientRule, Events, Urls } from '../../NetworkConstants'
+import { Accuracy, ClientRule, Events, Urls } from '../../NetworkConstants'
 import { Styles } from './MainSceneStyles'
 
 interface IMainSceneState {
   status: string,
-  touchEvent: string
+  touchEvent: string,
+  accelerometerEvent: string,
+  geoLocationEvent: string
 }
 
 export class MainScene extends React.Component<null, IMainSceneState> {
@@ -20,10 +27,13 @@ export class MainScene extends React.Component<null, IMainSceneState> {
   }
   public state: IMainSceneState = {
     status: 'Unknown',
-    touchEvent: ''
+    touchEvent: 'touchEvent:Unknown',
+    accelerometerEvent: 'accelerometerEvent:Unknown',
+    geoLocationEvent: 'geoLocation:Unknown'
   }
   private socket: SocketIOClient.Socket = null
   private isConnected: boolean = false
+  private geoLocationWatchId = null
   public constructor(props) {
     super(props)
   }
@@ -38,11 +48,19 @@ export class MainScene extends React.Component<null, IMainSceneState> {
       this.setState({
         status: 'Connection failed'
       })
-      // tslint:disable-next-line:no-console
-      console.log('Connection failed:\n' + data)
     })
     this.socket.on(Events.On.connect, this.onSocketConnect)
     this.socket.connect()
+    this.setupAccelerometer()
+    this.setupGeoLocation()
+  }
+  public componentWillUnmount() {
+    if (this.isConnected) {
+      this.socket.disconnect()
+    }
+    if (this.geoLocationWatchId != null) {
+      navigator.geolocation.clearWatch(this.geoLocationWatchId)
+    }
   }
   public render(): JSX.Element {
     const touchGesture = this.generatePanResponder(this)
@@ -59,6 +77,16 @@ export class MainScene extends React.Component<null, IMainSceneState> {
         <Text>
           {
             this.state.touchEvent
+          }
+        </Text>
+        <Text>
+          {
+            this.state.accelerometerEvent
+          }
+        </Text>
+        <Text>
+          {
+            this.state.geoLocationEvent
           }
         </Text>
       </View>
@@ -90,19 +118,75 @@ locationY:${locationY}`
           })
           if (this.isConnected) {
             this.socket.emit(Events.Emit.touchEvent, PacketFactory.generatePacketObject([
-              locationX,
-              locationY
+              locationX * Accuracy,
+              locationY * Accuracy
             ]))
           }
         }
     })
   }
+  private setupGeoLocation() {
+    return new Promise(async (resolve, reject) => {
+      if (EnvironmentVariables.isIos) {
+        resolve()
+      } else {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
+        )
+        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+          resolve()
+        } else {
+          reject('Getting permission failed')
+        }
+      }
+    }).then(() => {
+      if (this.geoLocationWatchId != null) {
+        navigator.geolocation.clearWatch(this.geoLocationWatchId)
+      }
+      navigator.geolocation.getCurrentPosition(this.onGeoLocationDataIsReady)
+      this.geoLocationWatchId = navigator.geolocation.watchPosition(
+        this.onGeoLocationDataIsReady,
+        this.onGeoLocationError
+      )
+    }).catch((exception) => {
+      this.setState({
+        geoLocationEvent: exception
+      })
+    })
+  }
+  private onGeoLocationDataIsReady = (data) => {
+    const accuracy: number = data.coords.accuracy
+    const altitude: number = data.coords.altitude
+    const heading: number = data.coords.heading
+    const latitude: number = data.coords.latitude
+    const longitude: number = data.coords.longitude
+    const speed: number = data.coords.speed
+    this.setState({
+      geoLocationEvent: `accuracy:${accuracy},altitude:${altitude},heading:${heading}
+latitude:${latitude},longitude:${longitude},speed:${speed}`
+    })
+    if (this.isConnected) {
+      this.socket.emit(Events.Emit.geoLocation, PacketFactory.generatePacketObject([
+        accuracy * Accuracy,
+        altitude * Accuracy,
+        heading * Accuracy,
+        latitude * Accuracy,
+        longitude * Accuracy,
+        speed * Accuracy
+      ]))
+    }
+  }
+  private onGeoLocationError = (error) => {
+    this.setState({
+      geoLocationEvent: `${error.code},${error.message}`
+    })
+  }
   private onSocketConnect = () => {
-    this.isConnected = true
     this.setState({
       status: 'Connection successfully'
     })
     this.socket.on(Events.On.readyReceived, () => {
+      this.isConnected = true
       if (isReadyMessageInterval != null) {
         clearInterval(isReadyMessageInterval)
       }
@@ -116,7 +200,35 @@ locationY:${locationY}`
     this.setState({
       status: 'Socket disconnected'
     })
-    // TODO
     this.isConnected = false
+  }
+  private setupAccelerometer() {
+    return new Promise(async () => {
+      try {
+        const observable = await new Accelerometer({
+          updateInterval: 100
+        })
+        observable.subscribe(({x, y, z}) => {
+          this.setState({
+            accelerometerEvent: `Accelerometer=>
+x:${x}
+y:${y}
+z:${z}`
+          })
+          if (this.isConnected) {
+            this.socket.emit(Events.Emit.accelerometerEvent, PacketFactory.generatePacketObject([
+              x * Accuracy,
+              y * Accuracy,
+              z * Accuracy
+            ]))
+          }
+        })
+      } catch (exception) {
+        this.setState({
+          status: `Accelerometer exception:
+  ${JSON.stringify(exception)}`
+        })
+      }
+    })
   }
 }

@@ -22,3 +22,4 @@ export const Events = {
 }
 
 export const ClientRule = 'sender'
+export const Accuracy = 10

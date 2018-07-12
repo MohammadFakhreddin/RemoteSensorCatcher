@@ -14,11 +14,10 @@
   "releaseAndroid": "cd android && ./gradlew assembleRelease && cd .."
  },
  "dependencies": {
-  "install": "^0.12.1",
-  "npm": "^6.1.0",
-  "react": "16.4.1",
+  "react": "16.0.0",
   "react-native": "0.49.5",
   "react-native-router-flux": "4.0.0-beta.26",
+  "react-native-sensors": "3.0.0",
   "react-native-status-bar-height": "2.0.0",
   "react-native-vector-icons": "4.5.0",
   "react-navigation": "1.0.0-beta.22",

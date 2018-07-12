@@ -12,5 +12,5 @@ export const EnvironmentVariables  = {
 }
 
 export const NetworkVariables = {
-  timeout: 1000
+  timeout: 4000
 }
