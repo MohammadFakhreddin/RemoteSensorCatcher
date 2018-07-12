@@ -1,5 +1,5 @@
 export const Urls = {
-  baseUrl : 'http://192.168.1.2:8001'
+  baseUrl : 'http://192.168.1.30:8082'
 }
 
 export const Events = {

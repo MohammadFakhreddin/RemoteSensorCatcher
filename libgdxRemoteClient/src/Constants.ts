@@ -7,7 +7,7 @@ const window = Dimensions.get('window')
 
 export const  EnvironmentVariables = {
   isDev: __DEV__,
-  isTest: false,
+  isTest: false, 
   isOfflineMode: false,
   isIos: Platform.OS === 'ios',
   isIPhoneX: window.width === 812 || window.height === 812

@@ -2,7 +2,7 @@ import Os from 'os'
 import Path from 'path'
 
 export const EnvironmentVariables  = {
-  port:  '8001',
+  port:  '8082',
   isDev:  true,
   isTest:  false,
   logFolder: Path.join(__dirname, '../log'),
