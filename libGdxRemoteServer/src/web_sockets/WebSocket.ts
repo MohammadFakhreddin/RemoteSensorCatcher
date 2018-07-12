@@ -10,12 +10,10 @@ import {
 } from './IWebSocket'
 
 export class ChatServer {
-  private listenPort: number = null
   private io: SocketIO.Server = null
   private receiverSocketId: string = null
-  public constructor(listenPort: number) {
-    this.listenPort = listenPort
-    this.io = SocketIO(this.listenPort, {
+  public constructor(server) {
+    this.io = SocketIO(server, {
       transports: ['websocket']
     })
     this.io.on(Events.On.connection, this.connection)

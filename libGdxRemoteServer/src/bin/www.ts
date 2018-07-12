@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
 import Cluster from 'cluster'
+import * as Http from 'http'
+import {App} from './../App'
 import {EnvironmentVariables} from './../Config'
 import {Logger} from './../utils/Logger'
 import {ChatServer} from './../web_sockets/WebSocket'
@@ -25,6 +27,34 @@ const setEnv =  (env) => {
 setEnv(process.argv[2] || 'dev')
 
 if (Cluster.isWorker) {
+  const onError = (error) => {
+    if (error.syscall !== 'listen') {
+      throw error
+    }
+
+    const bind = typeof port === 'string'
+      ? 'Pipe ' + port
+      : 'Port ' + port
+
+    // handle specific listen errors with friendly messages
+    switch (error.code) {
+      case 'EACCES':
+        Logger.error(bind + ' requires elevated privileges')
+        process.exit(1)
+      case 'EADDRINUSE':
+        Logger.error(bind + ' is already in use')
+        process.exit(1)
+      default:
+        throw error
+    }
+  }
+  const onListening = () => {
+    const addr = server.address()
+    const bind = typeof addr === 'string'
+      ? 'pipe ' + addr
+      : 'port ' + addr.port
+    Logger.log('Server is listening to ' + bind)
+  }
   /**
    * Normalize a port into a number, string, or false.
    */
@@ -41,8 +71,14 @@ if (Cluster.isWorker) {
     return false
   }
   const port = normalizePort(process.env.PORT || EnvironmentVariables.port)
+  App.set('port', port)
+  const server = Http.createServer(App)
+  server.listen(Number(port), '0.0.0.0', null, null)
+  server.on('error', onError)
+  server.on('listening', onListening)
   // tslint:disable-next-line:no-unused-expression
-  new ChatServer(Number(port))
+  new ChatServer(server)
+  Logger.log(__filename, 'Server is running on ' + port)
 } else {
   Cluster.fork()
   Cluster.on('online', (worker) => {
